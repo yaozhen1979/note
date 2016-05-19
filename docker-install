@@ -1,0 +1,64 @@
+本篇文章會記錄一些在 ubuntu 14.0 版如何透過敝公司的資安政策下使用 docker
+====== 如何安裝最新版的 docker ======
+ubuntu 14 apt-get 能安裝的 docker 是 1.0，而截至本文撰寫前最新版為 1.6\\
+
+===== STEP1. 設定 apt-get proxy =====
+編輯 /etc/apt/apt.conf
+''sudo vi /etc/apt/apt.conf''\\
+加入代理設定<code>
+Acquire::http::proxy "http://docker:Abc.2015@10.60.94.21:3128/";
+Acquire::https::proxy "http://docker:Abc.2015@10.60.94.21:3128/";</code>
+===== STEP2. 切換至 root =====
+<code bash>
+sudo su
+</code>
+===== STEP3. 下載 docker 安裝腳本=====
+先將代理設定至環境變數再用 wget 下載
+<code bash>
+export http_proxy=http://docker:Abc.2015@10.60.94.21:3128
+export https_proxy=http://docker:Abc.2015@10.60.94.21:3128
+wget --proxy-user=docker --proxy-password=Abc.2015 https://get.docker.com/ -O install-docker.sh
+</code>
+===== STEP4. 修改安裝腳本 =====
+''vi install-docker.sh''\\
+將下面兩行
+<code>
+$sh_c "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9"
+.....
+.....
+$sh_c "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 740B314AE3941731B942C66ADF4FD13717AAD7D6"
+</code>
+修改成
+<code>
+$sh_c "apt-key adv --keyserver-options http-proxy=http://docker:Abc.2015@10.60.94.21:3128 --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9"
+.....
+.....
+$sh_c "apt-key adv --keyserver-options http-proxy=http://docker:Abc.2015@10.60.94.21:3128 --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 740B314AE3941731B942C66ADF4FD13717AAD7D6"
+</code>
+===== STEP5. 執行安裝腳本=====
+''bash install-docker.sh''\\
+執行後會得到下列錯誤\\
+<code>FATA[0000] Error response from daemon: 404 page not found</code>
+其實這時候已經成功安裝了，但以防萬一我們繼續下面幾步
+===== STEP6. 設定 docker proxy =====
+由於 http_proxy 和 https_proxy 兩個環境變數會影響 docker 本身連到外網的行為\\
+先從 root 帳號登出再登入清空之前 export 的代理\\
+編輯 /etc/default/docker\\
+''vi /etc/default/docker''\\
+\\
+寫入下列並儲存\\
+<code>
+export http_proxy='http://docker:Abc.2015@10.60.94.21:3128/'
+export https_proxy='http://docker:Abc.2015@10.60.94.21:3128/'
+
+//下面是到公司內部的　docker repo server 抓 image 用的，如無需求可不用設定
+export no_proxy='10.62.41.134'
+DOCKER_OPTS="$DOCKER_OPTS --insecure-registry 10.62.41.134:5000"
+</code>
+重啟 docker\\
+''service docker restart''\\
+\\
+再重新執行一次安裝腳本\\
+''bash install-docker.sh''\\
+
+安裝成功！恭喜你再度拯救地球！
